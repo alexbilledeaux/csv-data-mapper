@@ -1,0 +1,36 @@
+{
+    "name": "list-reformatter",
+    "version": "1.0.0",
+    "description": "A tool to reformat CSV lists.",
+    "main": "bin/reformatLists.js",
+    "bin": {
+        "list-reformatter": "./bin/reformatLists.js"
+    },
+    "scripts": {
+        "start": "node bin/reformatLists.js"
+    },
+    "dependencies": {
+        "csv-parser": "^3.0.0",
+        "csv-stringify": "^5.6.5",
+        "dotenv": "^16.4.5",
+        "openai": "^4.47.1"
+    },
+    "devDependencies": {
+        "pkg": "^5.3.1"
+    },
+    "pkg": {
+        "scripts": "bin/reformatLists.js",
+        "assets": [
+            "node_modules/openai/**",
+            "node_modules/openai/_shims/auto/runtime-node.js"
+        ],
+        "outputPath": "dist",
+        "targets": [
+            "node14-linux-x64",
+            "node14-macos-x64",
+            "node14-win-x64"
+        ]
+    },
+    "author": "",
+    "license": "ISC"
+}
