@@ -88,7 +88,7 @@ To package the project into a distributable format using `pkg`:
         ]
       },
       "author": "",
-      "license": "ISC"
+      "license": "MIT"
     }
     ```
 
