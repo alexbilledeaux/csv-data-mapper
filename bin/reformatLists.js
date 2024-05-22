@@ -27,16 +27,26 @@ if (!fs.existsSync(outputDir)) {
 // This is the required column order for our output CSV
 const columnOrder = ['email', 'first', 'last', 'street', 'city', 'state', 'zip', 'phone', 'lead_creation_date'];
 
-// OpenAI guesses the header for each column of the input CSV
-const guessHeaders = async (headerList, sampleValues) => {
-    const messages = [
-        { role: "system", content: `You are a helpful AI assistant that automatically detects data types in CSVs.` },
-        { role: "user", content: `Given the following column headers and their first five values:
-Headers: ${headerList.join(', ')}
-Values: ${sampleValues.map((values, index) => `${headerList[index]}: ${values.join(', ')}`).join('; ')}
-Map them to the most appropriate standardized headers from this list: ${columnOrder.join(', ')}. Provide the mapping in the format 'original_header: standardized_header'. Respond with no additional text.` }
-    ];
+// Remove the BOM of the input CSV
+const removeBOM = (content) => {
+    if (content.charCodeAt(0) === 0xFEFF) {
+        return content.slice(1);
+    }
+    return content;
+};
 
+const writeOutputFile = (outputFilePath, reorderedData, reorderedHeaders) => {
+    const output = stringify(reorderedData, { header: true, columns: reorderedHeaders });
+    fs.writeFile(outputFilePath, output, 'utf8', (err) => {
+        if (err) {
+            console.error(`Error writing file ${outputFilePath}:`, err);
+        } else {
+            console.log(`Successfully wrote ${outputFilePath}.`);
+        }
+    });
+};
+
+const getOpenAiResponse = async (messages) => {
     try {
         const completion = await openai.chat.completions.create({
             model: "gpt-4-1106-preview",
@@ -60,6 +70,19 @@ Map them to the most appropriate standardized headers from this list: ${columnOr
         console.error('OpenAI Error:', error);
         return null;
     }
+}
+
+// OpenAI guesses the header for each column of the input CSV
+const guessHeaders = async (headerList, sampleValues) => {
+    const messages = [
+        { role: "system", content: `You are a helpful AI assistant that automatically detects data types in CSVs.` },
+        { role: "user", content: `Given the following column headers and their first five values:
+Headers: ${headerList.join(', ')}
+Values: ${sampleValues.map((values, index) => `${headerList[index]}: ${values.join(', ')}`).join('; ')}
+Map them to the most appropriate standardized headers from this list: ${columnOrder.join(', ')}. Provide the mapping in the format 'original_header: standardized_header'. Respond with no additional text.` }
+    ];
+    let response = await getOpenAiResponse(messages);
+    return response;
 };
 
 // OpenAI guesses the header for each column of the input CSV
@@ -71,29 +94,8 @@ Data: ${sampleValues.map((values, index) => `${index}: ${values.join(', ')}`).jo
 Map them to the most appropriate standardized headers from this list: ${columnOrder.join(', ')}. Provide the mapping in the format 'index: standardized_header'. Respond with no additional text.` }
     ];
 
-    try {
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4-1106-preview",
-            messages: messages,
-            temperature: 0.1,
-            top_p: 1,
-            frequency_penalty: 0,
-            presence_penalty: 0
-        });
-
-        const response = completion.choices[0].message.content.trim();
-        const mappings = response.split('\n');
-        const headerMap = {};
-        mappings.forEach(mapping => {
-            const [original, standardized] = mapping.split(':').map(s => s.trim());
-            headerMap[original] = standardized;
-        });
-        console.log(headerMap);
-        return headerMap;
-    } catch (error) {
-        console.error('OpenAI Error:', error);
-        return null;
-    }
+    let response = await getOpenAiResponse(messages);
+    return response;
 };
 
 const getHeaders = (filePath) => {
@@ -137,14 +139,6 @@ const csvHasHeaders = async (inputFilePath) => {
         return null;
     }
 }
-
-// Remove the BOM of the input CSV
-const removeBOM = (content) => {
-    if (content.charCodeAt(0) === 0xFEFF) {
-        return content.slice(1);
-    }
-    return content;
-};
 
 const reformatCsvWithHeaders = (inputFilePath, outputFilePath) => {
     const results = [];
@@ -194,15 +188,7 @@ const reformatCsvWithHeaders = (inputFilePath, outputFilePath) => {
                     return reorderedRow;
                 });
 
-                // Write the reordered data to the output file
-                const output = stringify(reorderedData, { header: true, columns: reorderedHeaders });
-                fs.writeFile(outputFilePath, output, 'utf8', (err) => {
-                    if (err) {
-                        console.error(`Error writing file ${outputFilePath}:`, err);
-                    } else {
-                        console.log(`Successfully wrote ${outputFilePath}.`);
-                    }
-                });
+                writeOutputFile(outputFilePath, reorderedData, reorderedHeaders);
             } else {
                 console.log(`File ${inputFilePath} does not contain any of the required headers and will be ignored.`);
             }
@@ -256,15 +242,7 @@ const reformatCsvWithoutHeaders = (inputFilePath, outputFilePath) => {
                 return reorderedRow;
             });
 
-            // Write the reordered data to the output file
-            const output = stringify(reorderedData, { header: true, columns: reorderedHeaders });
-            fs.writeFile(outputFilePath, output, 'utf8', (err) => {
-                if (err) {
-                    console.error(`Error writing file ${outputFilePath}:`, err);
-                } else {
-                    console.log(`Successfully wrote ${outputFilePath}.`);
-                }
-            });
+            writeOutputFile(outputFilePath, reorderedData, reorderedHeaders);
         });
 
         // Write content to the parser
