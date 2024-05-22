@@ -2,14 +2,15 @@
 
 ## Overview
 
-CSV Data Mapper is a tool designed to reformat CSV files by detecting and mapping headers to standardized headers using the OpenAI API. The tool reads CSV files from an input directory, processes them with OpenAI to guess the appropriate standardized headers, and writes the reformatted data to an output directory.
+CSV Data Mapper is a tool designed to reformat CSV files by detecting and mapping headers to standardized headers using the OpenAI API. The tool reads CSV files from an input directory, examines the first five values of each column, processes them with OpenAI to guess the appropriate standardized headers, and writes the reformatted data to an output directory.
 
 ## Features
 
 - Reads CSV files from the `inputLists` directory.
-- Uses OpenAI API to guess and map column headers to a standardized format.
+- Uses OpenAI API to guess and map column headers and sample values to a standardized format.
 - Reorders columns based on a predefined column order.
 - Writes the reformatted CSV files to the `outputLists` directory.
+- Inserts headers if they are not present in the input files.
 
 ## Prerequisites
 
