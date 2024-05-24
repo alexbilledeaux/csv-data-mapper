@@ -5,8 +5,9 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const csvParser = require('csv-parser');
-const stringify = require('csv-stringify/lib/sync');
+const { createObjectCsvStringifier } = require('csv-writer');
 const OpenAI = require('openai');
+var removeBOM = require('remove-bom-stream');
 
 // OpenAI Configuration
 const apiKey = process.env.OPENAI_KEY;
@@ -27,26 +28,8 @@ if (!fs.existsSync(outputDir)) {
 // This is the required column order for our output CSV
 const columnOrder = ['email', 'first', 'last', 'street', 'city', 'state', 'zip', 'phone', 'lead_creation_date'];
 
-// Remove the BOM of the input CSV
-const removeBOM = (content) => {
-    if (content.charCodeAt(0) === 0xFEFF) {
-        return content.slice(1);
-    }
-    return content;
-};
-
-const writeOutputFile = (outputFilePath, reorderedData, reorderedHeaders) => {
-    const output = stringify(reorderedData, { header: true, columns: reorderedHeaders });
-    fs.writeFile(outputFilePath, output, 'utf8', (err) => {
-        if (err) {
-            console.error(`Error writing file ${outputFilePath}:`, err);
-        } else {
-            console.log(`Successfully wrote ${outputFilePath}.`);
-        }
-    });
-};
-
 const getOpenAiResponse = async (messages) => {
+    console.log("\n-----------\nMaking request to OpenAI...\n-------------\n");
     try {
         const completion = await openai.chat.completions.create({
             model: "gpt-4-1106-preview",
@@ -73,12 +56,11 @@ const getOpenAiResponse = async (messages) => {
 }
 
 // OpenAI guesses the header for each column of the input CSV
-const guessHeaders = async (headerList, sampleValues) => {
+const guessHeaders = async (headerList) => {
     const messages = [
         { role: "system", content: `You are a helpful AI assistant that automatically detects data types in CSVs.` },
-        { role: "user", content: `Given the following column headers and their first five values:
+        { role: "user", content: `Given the following column headers:
 Headers: ${headerList.join(', ')}
-Values: ${sampleValues.map((values, index) => `${headerList[index]}: ${values.join(', ')}`).join('; ')}
 Map them to the most appropriate standardized headers from this list: ${columnOrder.join(', ')}. Provide the mapping in the format 'original_header: standardized_header'. Respond with no additional text.` }
     ];
     let response = await getOpenAiResponse(messages);
@@ -102,6 +84,7 @@ const getHeaders = (filePath) => {
     return new Promise((resolve, reject) => {
         const headers = [];
         fs.createReadStream(filePath)
+            .pipe(removeBOM('utf-8'))
             .pipe(csvParser())
             .on('headers', (headerList) => {
                 headers.push(...headerList);
@@ -117,7 +100,7 @@ const csvHasHeaders = async (inputFilePath) => {
     let firstRow = await getHeaders(inputFilePath);
     const messages = [
         { role: "system", content: `You are a helpful AI assistant that automatically detects data types in CSVs.` },
-        { role: "user", content: `Examine the following column headers: ${firstRow.join(', ')}. Are these labels for data, or values for data? Respond with LABELS or VALUES and no other text.` }
+        { role: "user", content: `Examine the following data: ${firstRow.join(', ')}. Would you assume these were column headers in a CSV, or column data in a CSV? Respond with HEADERS or DATA and no other text.` }
     ];
     try {
         const completion = await openai.chat.completions.create({
@@ -129,7 +112,7 @@ const csvHasHeaders = async (inputFilePath) => {
             presence_penalty: 0
         });
         const response = completion.choices[0].message.content.trim();
-        if (response == "LABELS") {
+        if (response == "HEADERS") {
             return true;
         } else {
             return false;
@@ -140,124 +123,103 @@ const csvHasHeaders = async (inputFilePath) => {
     }
 }
 
-const reformatCsvWithHeaders = (inputFilePath, outputFilePath) => {
-    const results = [];
-    let headers = [];
-    let headerMap;
-    const sampleValues = {};
 
-    fs.readFile(inputFilePath, 'utf8', async (err, data) => {
-        if (err) {
-            console.error(`Error reading file ${inputFilePath}:`, err);
-            return;
-        }
-
-        const content = removeBOM(data);
-        const parser = csvParser();
-
-        parser.on('headers', (headerList) => {
-            headers = headerList;
-            headerList.forEach(header => {
-                sampleValues[header] = [];
-            });
-        });
-
-        parser.on('data', (row) => {
-            results.push(row);
-            headers.forEach(header => {
-                if (sampleValues[header].length < 5) {
-                    sampleValues[header].push(row[header]);
-                }
-            });
-        });
-
-        parser.on('end', async () => {
-            const sampleArray = headers.map(header => sampleValues[header]);
-            headerMap = await guessHeaders(headers, sampleArray);
-            headers = Object.keys(headerMap).map(header => headerMap[header]);
-            console.log(`File ${inputFilePath} Remapped Headers: ${headers}`);
-            if (headers && headers.length > 0) {
-                const reorderedHeaders = columnOrder.filter(column => headers.includes(column));
-                console.log(`Reordered headers: ${reorderedHeaders}`);
-                const reorderedData = results.map(row => {
-                    const reorderedRow = {};
-                    reorderedHeaders.forEach(column => {
-                        const originalHeader = Object.keys(headerMap).find(key => headerMap[key] === column);
-                        reorderedRow[column] = row[originalHeader] || '';
-                    });
-                    return reorderedRow;
+const getSampleValues = (filePath) => {
+    return new Promise((resolve, reject) => {
+        const sampleValues = {};
+        fs.createReadStream(filePath)
+            .pipe(removeBOM('utf-8'))
+            .pipe(csvParser({ headers: false }))
+            .on('data', (row) => {
+                Object.keys(row).forEach((index) => {
+                    if (!sampleValues[index]) {
+                        sampleValues[index] = [];
+                    }
+                    if (sampleValues[index].length < 5) {
+                        sampleValues[index].push(row[index]);
+                    }
                 });
-
-                writeOutputFile(outputFilePath, reorderedData, reorderedHeaders);
-            } else {
-                console.log(`File ${inputFilePath} does not contain any of the required headers and will be ignored.`);
-            }
-        });
-
-        // Write content to the parser
-        parser.write(content);
-        parser.end();
+                resolve(sampleValues);
+            })
+            .on('error', (err) => {
+                reject(`Error reading file ${filePath}: ${err.message}`);
+            });
     });
 };
 
-const reformatCsvWithoutHeaders = (inputFilePath, outputFilePath) => {
-    const results = [];
-    const sampleValues = {};
-
-    fs.readFile(inputFilePath, 'utf8', async (err, data) => {
-        if (err) {
-            console.error(`Error reading file ${inputFilePath}:`, err);
-            return;
-        }
-
-        const content = removeBOM(data);
-        const parser = csvParser({ headers: false });
-
-        parser.on('data', (row) => {
-            results.push(row);
-            Object.keys(row).forEach((index) => {
-                if (!sampleValues[index]) {
-                    sampleValues[index] = [];
-                }
-                if (sampleValues[index].length < 5) {
-                    sampleValues[index].push(row[index]);
-                }
-            });
-        });
-
-        parser.on('end', async () => {
-            const sampleArray = Object.keys(sampleValues).map(index => sampleValues[index]);
-            const headerMap = await guessHeadersFromData(sampleArray);
-            const headers = Object.values(headerMap);
-            const reorderedHeaders = columnOrder.filter(column => headers.includes(column));
-
-            console.log(`Reordered headers: ${reorderedHeaders}`);
-
-            const reorderedData = results.map(row => {
-                const reorderedRow = {};
-                Object.keys(headerMap).forEach(index => {
-                    const column = headerMap[index];
-                    reorderedRow[column] = row[index] || '';
-                });
-                return reorderedRow;
-            });
-
-            writeOutputFile(outputFilePath, reorderedData, reorderedHeaders);
-        });
-
-        // Write content to the parser
-        parser.write(content);
-        parser.end();
+const reorderRow = (row, reorderedHeaders, headerMap) => {
+    const reorderedRow = {};
+    reorderedHeaders.forEach(column => {
+        const originalHeader = Object.keys(headerMap).find(key => headerMap[key] === column);
+        reorderedRow[column] = row[originalHeader] || '';
     });
+    return reorderedRow;
 };
+
+const reformatCsvWithHeadersStream = async (inputFilePath, outputFilePath) => {
+    let headers = await getHeaders(inputFilePath);
+    console.log(headers);
+    let headerMap = await guessHeaders(headers);
+    headers = Object.keys(headerMap).map(header => headerMap[header]);
+    const reorderedHeaders = columnOrder.filter(column => headers.includes(column));
+
+    const csvStringifier = createObjectCsvStringifier({
+        header: reorderedHeaders.map(header => ({ id: header, title: header }))
+    });
+
+    fs.writeFileSync(outputFilePath, csvStringifier.getHeaderString());
+
+    fs.createReadStream(inputFilePath)
+        .pipe(removeBOM('utf-8'))
+        .pipe(csvParser())
+        .on('data', (row) => {
+            let reorderedRow = reorderRow(row, reorderedHeaders, headerMap);
+            fs.appendFileSync(outputFilePath, csvStringifier.stringifyRecords([reorderedRow]));
+        })
+        .on('end', () => {
+            console.log('CSV file processing and writing completed.');
+        })
+        .on('error', (error) => {
+            console.error(`Error reading the CSV file: ${error.message}`);
+        });
+}
+
+const reformatCsvWithoutHeadersStream = async (inputFilePath, outputFilePath) => {
+    let sampleValues = await getSampleValues(inputFilePath);
+    const sampleArray = Object.keys(sampleValues).map(index => sampleValues[index]);
+    const headerMap = await guessHeadersFromData(sampleArray);
+    const headers = Object.values(headerMap);
+    const reorderedHeaders = columnOrder.filter(column => headers.includes(column));
+
+    const csvStringifier = createObjectCsvStringifier({
+        header: reorderedHeaders.map(header => ({ id: header, title: header }))
+    });
+
+    fs.writeFileSync(outputFilePath, csvStringifier.getHeaderString());
+
+    fs.createReadStream(inputFilePath)
+        .pipe(removeBOM('utf-8'))
+        .pipe(csvParser({ headers: false }))
+        .on('data', (row) => {
+            console.log(row);
+            let reorderedRow = reorderRow(row, reorderedHeaders, headerMap);
+            fs.appendFileSync(outputFilePath, csvStringifier.stringifyRecords([reorderedRow]));
+        })
+        .on('end', () => {
+            console.log('CSV file processing and writing completed.');
+        })
+        .on('error', (error) => {
+            console.error(`Error reading the CSV file: ${error.message}`);
+        });
+}
 
 // Reformat a single input CSV
 const reformatFile = async (inputFilePath, outputFilePath) => {
     console.log(await csvHasHeaders(inputFilePath));
     if (await csvHasHeaders(inputFilePath)) {
-        reformatCsvWithHeaders(inputFilePath, outputFilePath);
+        reformatCsvWithHeadersStream(inputFilePath, outputFilePath);
     } else {
-        reformatCsvWithoutHeaders(inputFilePath, outputFilePath);
+        reformatCsvWithoutHeadersStream(inputFilePath, outputFilePath);
     }
 };
 
@@ -272,8 +234,11 @@ const reformatLists = () => {
         files.forEach(file => {
             const inputFilePath = path.join(inputDir, file);
             const outputFilePath = path.join(outputDir, file);
-
-            reformatFile(inputFilePath, outputFilePath);
+            if (file !== ".DS_Store") {
+                reformatFile(inputFilePath, outputFilePath);
+            } else {
+                console.log("Skipping .DS_Store");
+            }
         });
     });
 };
