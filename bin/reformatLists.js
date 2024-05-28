@@ -3,6 +3,7 @@
 require('dotenv').config();
 
 const fs = require('fs');
+const fsPromises = fs.promises;
 const path = require('path');
 const csvParser = require('csv-parser');
 const { createObjectCsvStringifier } = require('csv-writer');
@@ -169,19 +170,23 @@ const reformatCsvWithHeadersStream = async (inputFilePath, outputFilePath) => {
 
     fs.writeFileSync(outputFilePath, csvStringifier.getHeaderString());
 
-    fs.createReadStream(inputFilePath)
-        .pipe(removeBOM('utf-8'))
-        .pipe(csvParser())
-        .on('data', (row) => {
-            let reorderedRow = reorderRow(row, reorderedHeaders, headerMap);
-            fs.appendFileSync(outputFilePath, csvStringifier.stringifyRecords([reorderedRow]));
-        })
-        .on('end', () => {
-            console.log('CSV file processing and writing completed.');
-        })
-        .on('error', (error) => {
-            console.error(`Error reading the CSV file: ${error.message}`);
-        });
+    return new Promise((resolve, reject) => {
+        fs.createReadStream(inputFilePath)
+            .pipe(removeBOM('utf-8'))
+            .pipe(csvParser())
+            .on('data', (row) => {
+                let reorderedRow = reorderRow(row, reorderedHeaders, headerMap);
+                fs.appendFileSync(outputFilePath, csvStringifier.stringifyRecords([reorderedRow]));
+            })
+            .on('end', () => {
+                console.log('CSV file processing and writing completed.');
+                resolve();
+            })
+            .on('error', (error) => {
+                console.error(`Error reading the CSV file: ${error.message}`);
+                reject(error);
+            });
+    });
 }
 
 const reformatCsvWithoutHeadersStream = async (inputFilePath, outputFilePath) => {
@@ -197,50 +202,97 @@ const reformatCsvWithoutHeadersStream = async (inputFilePath, outputFilePath) =>
 
     fs.writeFileSync(outputFilePath, csvStringifier.getHeaderString());
 
-    fs.createReadStream(inputFilePath)
-        .pipe(removeBOM('utf-8'))
-        .pipe(csvParser({ headers: false }))
-        .on('data', (row) => {
-            console.log(row);
-            let reorderedRow = reorderRow(row, reorderedHeaders, headerMap);
-            fs.appendFileSync(outputFilePath, csvStringifier.stringifyRecords([reorderedRow]));
-        })
-        .on('end', () => {
-            console.log('CSV file processing and writing completed.');
-        })
-        .on('error', (error) => {
-            console.error(`Error reading the CSV file: ${error.message}`);
-        });
+    return new Promise((resolve, reject) => {
+        fs.createReadStream(inputFilePath)
+            .pipe(removeBOM('utf-8'))
+            .pipe(csvParser({ headers: false }))
+            .on('data', (row) => {
+                console.log(row);
+                let reorderedRow = reorderRow(row, reorderedHeaders, headerMap);
+                fs.appendFileSync(outputFilePath, csvStringifier.stringifyRecords([reorderedRow]));
+            })
+            .on('end', () => {
+                console.log('CSV file processing and writing completed.');
+                resolve();
+            })
+            .on('error', (error) => {
+                console.error(`Error reading the CSV file: ${error.message}`);
+                reject(error);
+            });
+    });
 }
 
 // Reformat a single input CSV
 const reformatFile = async (inputFilePath, outputFilePath) => {
-    console.log(await csvHasHeaders(inputFilePath));
     if (await csvHasHeaders(inputFilePath)) {
-        reformatCsvWithHeadersStream(inputFilePath, outputFilePath);
+        await reformatCsvWithHeadersStream(inputFilePath, outputFilePath);
     } else {
-        reformatCsvWithoutHeadersStream(inputFilePath, outputFilePath);
+        await reformatCsvWithoutHeadersStream(inputFilePath, outputFilePath);
     }
 };
 
 // Reformat every file in the input directory
-const reformatLists = () => {
-    fs.readdir(inputDir, (err, files) => {
+const reformatLists = async () => {
+    try {
+        const files = await fsPromises.readdir(inputDir);
+
+        const fileProcessingPromises = files
+            .filter(file => file !== ".DS_Store")
+            .map(async file => {
+                const inputFilePath = path.join(inputDir, file);
+                const outputFilePath = path.join(outputDir, file);
+                await reformatFile(inputFilePath, outputFilePath);
+            });
+
+        await Promise.all(fileProcessingPromises);
+
+        console.log('All files processed successfully');
+    } catch (err) {
+        console.error('Error reading input directory:', err);
+        throw err;
+    }
+};
+
+const combineOutputFiles = () => {
+    const combinedOutputPath = path.join(outputDir, 'combined_output.csv');
+    const csvStringifier = createObjectCsvStringifier({
+        header: columnOrder.map(header => ({ id: header, title: header }))
+    });
+
+    // Write the header row to the combined file
+    fs.writeFileSync(combinedOutputPath, csvStringifier.getHeaderString());
+
+    fs.readdir(outputDir, (err, files) => {
         if (err) {
-            console.error('Error reading input directory:', err);
+            console.error('Error reading output directory:', err);
             return;
         }
 
         files.forEach(file => {
-            const inputFilePath = path.join(inputDir, file);
-            const outputFilePath = path.join(outputDir, file);
-            if (file !== ".DS_Store") {
-                reformatFile(inputFilePath, outputFilePath);
-            } else {
-                console.log("Skipping .DS_Store");
+            const filePath = path.join(outputDir, file);
+            if (file !== ".DS_Store" && file !== 'combined_output.csv') {
+                fs.createReadStream(filePath)
+                    .pipe(removeBOM('utf-8'))
+                    .pipe(csvParser())
+                    .on('data', (row) => {
+                        fs.appendFileSync(combinedOutputPath, csvStringifier.stringifyRecords([row]));
+                    })
+                    .on('end', () => {
+                        console.log(`Finished processing ${file}`);
+                    })
+                    .on('error', (error) => {
+                        console.error(`Error reading the CSV file ${file}: ${error.message}`);
+                    });
             }
         });
     });
 };
 
-reformatLists();
+reformatLists()
+    .then(() => {
+        console.log('Reformatted all CSVs. Creating combined file...');
+        combineOutputFiles();
+    })
+    .catch((err) => {
+        console.error('Error during reformatting:', err);
+    });
