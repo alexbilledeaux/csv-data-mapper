@@ -10,8 +10,23 @@ const { createObjectCsvStringifier } = require('csv-writer');
 const OpenAI = require('openai');
 var removeBOM = require('remove-bom-stream');
 
-// OpenAI Configuration
-const apiKey = process.env.OPENAI_KEY;
+function getApiKey() {
+    const configPath = path.resolve(__dirname, 'config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      return config.OPENAI_KEY;
+    } else {
+      return process.env.OPENAI_KEY;
+    }
+  }
+  
+const apiKey = getApiKey();
+  
+if (!apiKey) {
+    console.error('OpenAI API Key not found. Please set it in config.json or as an environment variable.');
+    process.exit(1);
+}
+
 const openai = new OpenAI({
     apiKey: apiKey,
 });
@@ -30,7 +45,7 @@ if (!fs.existsSync(outputDir)) {
 const columnOrder = ['email', 'first', 'last', 'street', 'city', 'state', 'zip', 'phone', 'lead_creation_date'];
 
 const getOpenAiResponse = async (messages) => {
-    console.log("\n-----------\nMaking request to OpenAI...\n-------------\n");
+    //console.log("\n-----------\nMaking request to OpenAI...\n-------------\n");
     try {
         const completion = await openai.chat.completions.create({
             model: "gpt-4-1106-preview",
@@ -48,7 +63,7 @@ const getOpenAiResponse = async (messages) => {
             const [original, standardized] = mapping.split(':').map(s => s.trim());
             headerMap[original] = standardized;
         });
-        console.log(headerMap);
+        //console.log(headerMap);
         return headerMap;
     } catch (error) {
         console.error('OpenAI Error:', error);
@@ -159,7 +174,7 @@ const reorderRow = (row, reorderedHeaders, headerMap) => {
 
 const reformatCsvWithHeadersStream = async (inputFilePath, outputFilePath) => {
     let headers = await getHeaders(inputFilePath);
-    console.log(headers);
+    //console.log(headers);
     let headerMap = await guessHeaders(headers);
     headers = Object.keys(headerMap).map(header => headerMap[header]);
     const reorderedHeaders = columnOrder.filter(column => headers.includes(column));
@@ -179,7 +194,7 @@ const reformatCsvWithHeadersStream = async (inputFilePath, outputFilePath) => {
                 fs.appendFileSync(outputFilePath, csvStringifier.stringifyRecords([reorderedRow]));
             })
             .on('end', () => {
-                console.log('CSV file processing and writing completed.');
+                //console.log('CSV file processing and writing completed.');
                 resolve();
             })
             .on('error', (error) => {
@@ -207,12 +222,12 @@ const reformatCsvWithoutHeadersStream = async (inputFilePath, outputFilePath) =>
             .pipe(removeBOM('utf-8'))
             .pipe(csvParser({ headers: false }))
             .on('data', (row) => {
-                console.log(row);
+                //console.log(row);
                 let reorderedRow = reorderRow(row, reorderedHeaders, headerMap);
                 fs.appendFileSync(outputFilePath, csvStringifier.stringifyRecords([reorderedRow]));
             })
             .on('end', () => {
-                console.log('CSV file processing and writing completed.');
+                //console.log('CSV file processing and writing completed.');
                 resolve();
             })
             .on('error', (error) => {
@@ -233,6 +248,7 @@ const reformatFile = async (inputFilePath, outputFilePath) => {
 
 // Reformat every file in the input directory
 const reformatLists = async () => {
+    console.log("Mapping CSV data. This may take several minutes...");
     try {
         const files = await fsPromises.readdir(inputDir);
 
@@ -246,7 +262,7 @@ const reformatLists = async () => {
 
         await Promise.all(fileProcessingPromises);
 
-        console.log('All files processed successfully');
+        //console.log('All files processed successfully');
     } catch (err) {
         console.error('Error reading input directory:', err);
         throw err;
