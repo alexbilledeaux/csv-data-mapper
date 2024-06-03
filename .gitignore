@@ -1,6 +1,9 @@
 # Mac files
 .DS_Store
 
+# Config files
+config.json
+
 # Logs
 logs
 *.log

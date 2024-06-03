@@ -1,13 +1,11 @@
 {
-    "name": "list-reformatter",
+    "name": "csv-data-mapper",
     "version": "1.0.0",
     "description": "A tool to reformat CSV lists.",
-    "main": "bin/reformatLists.js",
-    "bin": {
-        "list-reformatter": "./bin/reformatLists.js"
-    },
+    "main": "index.js",
     "scripts": {
-        "start": "node bin/reformatLists.js"
+        "start": "node index.js",
+        "build": "pkg . --out-path dist"
     },
     "dependencies": {
         "csv-parser": "^3.0.0",
@@ -20,18 +18,21 @@
     "devDependencies": {
         "pkg": "^5.3.1"
     },
+    "bin": "index.js",
     "pkg": {
-        "scripts": "bin/reformatLists.js",
-        "assets": [
-            "node_modules/openai/**",
-            "node_modules/openai/_shims/auto/runtime-node.js"
-        ],
-        "outputPath": "dist",
-        "targets": [
-            "node14-linux-x64",
-            "node14-macos-x64",
-            "node14-win-x64"
-        ]
+      "assets": [
+        "inputFiles/**/*",
+        "outputFiles/**/*",
+        "config.json",
+        "src/**/*",
+        "node_modules/openai/**",
+        "node_modules/openai/_shims/auto/runtime-node.js"
+      ],
+      "targets": [
+        "node14-linux-x64",
+        "node14-macos-x64",
+        "node14-win-x64"
+      ]
     },
     "author": "",
     "license": "MIT"
