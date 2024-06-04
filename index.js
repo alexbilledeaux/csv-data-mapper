@@ -3,10 +3,20 @@ const path = require('path');
 const { guessHeaderIndex, guessDataStartingRow } = require('./src/apiHandler');
 const { mapCSV, deleteLines, writeCSV } = require('./src/csvHandler');
 
-const desiredColumnOrder = ['email', 'first', 'last', 'street', 'city', 'state', 'zip', 'phone', 'lead_creation_date'];
-const inputDirectoryPath = path.join(process.cwd(), 'inputFiles');
-const outputDirectoryPath = path.join(process.cwd(), 'outputFiles');
+const getBasePath = () => {
+  // We are triggering this directly with node
+  if (path.dirname(process.execPath).includes('node')) {
+    return process.cwd();
+  } else {
+    // We are triggering this via pkg
+    return path.dirname(process.execPath);
+  }
+}
+const basePath = getBasePath();
+const inputDirectoryPath = path.join(basePath, 'inputFiles');
+const outputDirectoryPath = path.join(basePath, 'outputFiles');
 const masterFilePath = path.join(outputDirectoryPath, 'combinedFiles.csv');
+const desiredColumnOrder = ['email', 'first', 'last', 'street', 'city', 'state', 'zip', 'phone', 'lead_creation_date'];
 
 const reorderColumns = (row, columnOrder, desiredColumnOrder) => {
   const reorderedRow = {};
