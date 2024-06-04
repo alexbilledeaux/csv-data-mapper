@@ -1,27 +1,20 @@
 # CSV Data Mapper
 
-## Overview
-
-CSV Data Mapper is a tool designed to reformat CSV files by detecting and mapping headers to standardized headers using the OpenAI API. The tool reads CSV files from an input directory, examines the first five values of each column, processes them with OpenAI to guess the appropriate standardized headers, and writes the reformatted data to an output directory.
+CSV Data Mapper is a tool designed to standardize and reformat CSV files by mapping headers to a predefined set of desired headers. This tool reads files from an input directory, processes them using the OpenAI API, and writes the reformatted data to an output directory.
 
 ## Features
 
-- Reads CSV files from the `inputLists` directory.
-- Uses OpenAI API to guess and map column headers and sample values to a standardized format.
-- Reorders columns based on a predefined column order.
-- Writes the reformatted CSV files to the `outputLists` directory.
-- Inserts headers if they are not present in the input files.
-
-## Prerequisites
-
-- Node.js installed on your machine.
-- OpenAI API key.
+- **Header Mapping:** Automatically maps headers in the CSV files to a standardized set of headers.
+- **Data Reordering:** Reorders columns according to the specified desired column order.
+- **Dynamic Row Detection:** Identifies the starting row of data, even when headers are not present.
+- **Batch Processing**: Processes all CSV files in the input directory and combines them into a single output file.
+- **Error Handling**: Provides detailed error messages for troubleshooting.
 
 ## Installation
 
 1. Clone the repository to your local machine:
     ```bash
-    git clone https://github.com/yourusername/csv-data-mapper.git
+    git clone https://github.com/alexbilledeaux/csv-data-mapper.git
     cd csv-data-mapper
     ```
 
@@ -30,75 +23,31 @@ CSV Data Mapper is a tool designed to reformat CSV files by detecting and mappin
     npm install
     ```
 
-3. Create a `.env` file in the root directory and add your OpenAI API key:
-    ```env
-    OPENAI_KEY=your-api-key-here
-    ```
-
 ## Usage
 
-1. Place the CSV files you want to reformat into the `inputLists` directory.
-2. Run the data mapper script:
+1. Place the CSV files you want to reformat into the `inputFiles` directory.
+2. Run the script:
     ```bash
-    node bin/reformatLists.js
+    npm start
     ```
-3. The reformatted CSV files will be saved in the `outputLists` directory.
+3. The reformatted CSV files will be saved in the `outputFiles` directory.
 
 ## Packaging
 
-To package the project into a distributable format using `pkg`:
+To package the project into a distributable format using `pkg`, use the provided npm script:
 
-1. Install `pkg` if you haven't already:
+1. Package the project:
     ```bash
-    npm install --save-dev pkg
+    npm run build
     ```
 
-2. Add the following `pkg` configuration to your `package.json`:
-    ```json
-    {
-      "name": "csv-data-mapper",
-      "version": "1.0.0",
-      "description": "A tool to reformat and map CSV data.",
-      "main": "bin/reformatLists.js",
-      "bin": {
-        "data-mapper": "./bin/reformatLists.js"
-      },
-      "scripts": {
-        "start": "node bin/reformatLists.js"
-      },
-      "dependencies": {
-        "csv-parser": "^3.0.0",
-        "csv-stringify": "^5.0.0",
-        "openai": "^4.0.0",
-        "dotenv": "^10.0.0"
-      },
-      "devDependencies": {
-        "pkg": "^5.3.1"
-      },
-      "pkg": {
-        "scripts": "bin/reformatLists.js",
-        "assets": [
-          "node_modules/openai/**",
-          "node_modules/openai/_shims/auto/runtime-node.js"
-        ],
-        "outputPath": "dist",
-        "targets": [
-          "node14-linux-x64",
-          "node14-macos-x64",
-          "node14-win-x64"
-        ]
-      },
-      "author": "",
-      "license": "MIT"
-    }
-    ```
+2. The executables for different platforms will be created in the `dist` directory, with versions for Linux, macOS, and Windows.
 
-3. Package the project:
-    ```bash
-    npx pkg . --out-path dist
-    ```
+## Configuration
 
-4. The executables for different platforms will be created in the `dist` directory.
+- **Column Order:** The script uses a predefined column order to rearrange the columns in your CSV files. You can customize this order by modifying the desiredColumnOrder array in index.js.
+
+- **OpenAI Key:** Place your OPENAI_KEY in a config.json file at the application's root.
 
 ## License
 
