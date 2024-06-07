@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { guessHeaderIndex, guessDataStartingRow } = require('./src/apiHandler');
-const { mapCSV, deleteLines, writeCSV } = require('./src/csvHandler');
+const { mapCSV, writeCSV } = require('./src/csvHandler');
 
 const getBasePath = () => {
   // We are triggering this directly with node
@@ -44,16 +44,9 @@ const writeHeadersToCSV = async (headers, outputFilePath) => {
 
 const processCSV = async (inputFilePath, outputFilePath, desiredColumnOrder) => {
   try {
-    const tempFilePath = path.join(
-      path.dirname(inputFilePath),
-      `${path.basename(inputFilePath, path.extname(inputFilePath))}_temp${path.extname(inputFilePath)}`
-    );
-
     const columnOrder = await guessHeaderIndex(inputFilePath, desiredColumnOrder);
     const startingIndex = await guessDataStartingRow(inputFilePath);
-    await deleteLines(inputFilePath, tempFilePath, 0, startingIndex);
-    await mapCSV(tempFilePath, outputFilePath, (row) => reorderColumns(row, columnOrder, desiredColumnOrder), true);
-    fs.unlinkSync(tempFilePath);
+    await mapCSV(inputFilePath, outputFilePath, (row) => reorderColumns(row, columnOrder, desiredColumnOrder), startingIndex, true);
   } catch (error) {
     console.error(`Error during CSV processing for ${inputFilePath}:`, error);
   }
@@ -70,7 +63,9 @@ const processAllCSVsInDirectory = async (inputDirectoryPath, desiredColumnOrder)
     for (const file of files) {
       if (path.extname(file) === '.csv') {
         const inputFilePath = path.join(inputDirectoryPath, file);
+        console.log("processing ", inputFilePath);
         await processCSV(inputFilePath, masterFilePath, desiredColumnOrder);
+        console.log("processed ", inputFilePath);
       }
     }
   } catch (error) {

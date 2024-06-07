@@ -25,7 +25,7 @@ const guessDataStartingRow = async (filepath) => {
     const storeRow = (row) => {
         rows.push(row);
     }
-    await readCSV(filepath, (row) => storeRow(row), null, 30);
+    await readCSV(filepath, (row) => storeRow(row), 0, 30);
     const messages = [
         { role: "system", content: `You are a helpful AI assistant that figures out the row in which data begins in a CSV.` },
         { role: "user", content: `Given the following rows of data: ${JSON.stringify(rows)}
@@ -59,7 +59,7 @@ const guessHeaderIndex = async (filepath, headersToLocate) => {
     const storeRow = (row) => {
         rows.push(row);
     }
-    await readCSV(filepath, (row) => storeRow(row), null, 5);
+    await readCSV(filepath, (row) => storeRow(row), 0, 100);
 
     const messages = [
         { role: "system", content: `You are a helpful AI assistant that normalizes headers in CSVs.` },

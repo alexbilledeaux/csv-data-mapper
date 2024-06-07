@@ -3,7 +3,7 @@ const csv = require('csv-parser');
 const stringify = require('csv-stringify');
 const removeBOM = require('remove-bom-stream');
 
-const readCSV = async (filePath, processRow, numOfLines) => {
+const readCSV = async (filePath, processRow, startingIndex, numOfLines) => {
   return new Promise((resolve, reject) => {
     let lineCount = 0;
 
@@ -11,7 +11,11 @@ const readCSV = async (filePath, processRow, numOfLines) => {
       .pipe(removeBOM('utf-8'))
       .pipe(csv({ headers: false }))
       .on('data', async (data) => {
-        if (numOfLines && lineCount >= numOfLines) {
+        if (lineCount < startingIndex) {
+          lineCount++;
+          return; // Ignore rows before startingIndex
+        }
+        if (numOfLines && (lineCount - startingIndex) >= numOfLines) {
           stream.unpipe();
           resolve();
           return;
@@ -51,31 +55,15 @@ const writeCSV = (filePath, append = false) => {
   return { writeRow, endWriting };
 };
 
-const mapCSV = async (inputFilePath, outputFilePath, processRow, append = false) => {
+const mapCSV = async (inputFilePath, outputFilePath, processRow, startingIndex, append = false) => {
   const writer = writeCSV(outputFilePath, append);
 
   await readCSV(inputFilePath, async (row) => {
     const processedRow = await processRow(row);
     await writer.writeRow(processedRow);
-  });
+  }, startingIndex);
 
   await writer.endWriting();
 };
 
-const deleteLines = async (inputFilePath, outputFilePath, startingIndex, numOfLines) => {
-  const rows = [];
-
-  await readCSV(inputFilePath, (row) => {
-    rows.push(row);
-  });
-
-  const filteredRows = rows.filter((_, index) => index < startingIndex || index >= startingIndex + numOfLines);
-
-  const writer = writeCSV(outputFilePath);
-  for (const row of filteredRows) {
-    await writer.writeRow(row);
-  }
-  await writer.endWriting();
-};
-
-module.exports = { readCSV, writeCSV, mapCSV, deleteLines };
+module.exports = { readCSV, writeCSV, mapCSV };
