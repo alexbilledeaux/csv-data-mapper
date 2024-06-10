@@ -63,9 +63,8 @@ const processAllCSVsInDirectory = async (inputDirectoryPath, desiredColumnOrder)
     for (const file of files) {
       if (path.extname(file) === '.csv') {
         const inputFilePath = path.join(inputDirectoryPath, file);
-        console.log("processing ", inputFilePath);
+        console.log("Processing ", inputFilePath);
         await processCSV(inputFilePath, masterFilePath, desiredColumnOrder);
-        console.log("processed ", inputFilePath);
       }
     }
   } catch (error) {

@@ -1,7 +1,10 @@
 const fs = require('fs');
 const csv = require('csv-parser');
 const stringify = require('csv-stringify');
+const { pipeline } = require('stream');
+const { promisify } = require('util');
 const removeBOM = require('remove-bom-stream');
+const pipelineAsync = promisify(pipeline);
 
 const readCSV = async (filePath, processRow, startingIndex, numOfLines) => {
   return new Promise((resolve, reject) => {
@@ -55,15 +58,45 @@ const writeCSV = (filePath, append = false) => {
   return { writeRow, endWriting };
 };
 
-const mapCSV = async (inputFilePath, outputFilePath, processRow, startingIndex, append = false) => {
-  const writer = writeCSV(outputFilePath, append);
+const mapCSV = async (inputFilePath, outputFilePath, processRow, startingIndex = 0, append = false) => {
+  const readStream = fs.createReadStream(inputFilePath);
+  const writeStream = fs.createWriteStream(outputFilePath, { flags: append ? 'a' : 'w' });
+  const stringifier = stringify();
 
-  await readCSV(inputFilePath, async (row) => {
-    const processedRow = await processRow(row);
-    await writer.writeRow(processedRow);
-  }, startingIndex);
+  let lineCount = 0;
 
-  await writer.endWriting();
+  const transformStream = new (require('stream')).Transform({
+    objectMode: true,
+    transform: async (row, encoding, callback) => {
+      if (lineCount < startingIndex) {
+        lineCount++;
+        return callback(); // Ignore rows before startingIndex
+      }
+
+      try {
+        const processedRow = await processRow(row);
+        callback(null, processedRow);
+        lineCount++;
+      } catch (error) {
+        callback(error);
+      }
+    }
+  });
+
+  try {
+    await pipelineAsync(
+      readStream,
+      removeBOM('utf-8'),
+      csv({ headers: false }),
+      transformStream,
+      stringifier,
+      writeStream
+    );
+
+    console.log(`CSV processing completed successfully for ${inputFilePath}`);
+  } catch (error) {
+    console.error(`Error during CSV processing for ${inputFilePath}:`, error);
+  }
 };
 
 module.exports = { readCSV, writeCSV, mapCSV };
