@@ -54,17 +54,41 @@ const guessDataStartingRow = async (filepath) => {
  * When given a CSV filepath and a set of headers to locate,
  * guessHeaderIndex returns ChatGPT's best guess at the index for each each requested header.
 */
-const guessHeaderIndex = async (filepath, headersToLocate) => {
+const guessHeaderIndex = async (filepath, columnOrderAndDescription) => {
     const rows = [];
     const storeRow = (row) => {
         rows.push(row);
     }
     await readCSV(filepath, (row) => storeRow(row), 0, 100);
 
+    const headersToLocate = columnOrderAndDescription.map(item => item.label);
+    const descriptions = columnOrderAndDescription.map(item => `${item.label}: ${item.description}`).join('\n');
+
     const messages = [
-        { role: "system", content: `You are a helpful AI assistant that normalizes headers in CSVs.` },
-        { role: "user", content: `Given the following rows of data: ${JSON.stringify(rows)}
-        Map them to the most appropriate standardized headers from this list: ${headersToLocate.join(', ')}. Provide the mapping in the format 'index: standardized_header'. Respond with no additional text.` }
+        {
+            role: "system",
+            content: "You are a helpful AI assistant that normalizes headers in CSVs."
+        },
+        {
+            role: "user",
+            content: `Given the following rows of data:
+    ${JSON.stringify(rows, null, 2)}
+    
+    Map the columns to the most appropriate standardized headers from this list:
+    ${headersToLocate.join(', ')}.
+    
+    Descriptions of the standardized headers:
+    ${descriptions}
+
+    Provide the mapping in the format 'index: standardized_header'. Do not include quotation marks or commas.
+    
+    Guidelines:
+    - If a column has no appropriate standardized header, do not include it in the response.
+    - If there is any doubt about the mapping, it is better to omit the column rather than map it incorrectly.
+    - If only a small portion of the data in a given column matches a standardized heading, do not include it.
+    
+    Respond with the mapping only, and no additional text.`
+        }
     ];
 
     try {

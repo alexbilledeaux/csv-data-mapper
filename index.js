@@ -16,7 +16,55 @@ const basePath = getBasePath();
 const inputDirectoryPath = path.join(basePath, 'inputFiles');
 const outputDirectoryPath = path.join(basePath, 'outputFiles');
 const masterFilePath = path.join(outputDirectoryPath, 'combinedFiles.csv');
-const desiredColumnOrder = ['email', 'first', 'last', 'street', 'city', 'state', 'zip', 'phone', 'lead_creation_date'];
+const columnOrderAndDescription = [
+  {
+    index: 0,
+    label: 'email',
+    description: 'A standard email address. This should usually contain an @ sign.'
+  },
+  {
+    index: 1,
+    label: 'first',
+    description: 'A first name. If the data only contains a full name, you may include it here.'
+  },
+  {
+    index: 2,
+    label: 'last',
+    description: 'A last name or surname.'
+  },
+  {
+    index: 3,
+    label: 'street',
+    description: 'A street address, sometimes including a unit number.'
+  },
+  {
+    index: 4,
+    label: 'city',
+    description: 'The name of the city.'
+  },
+  {
+    index: 5,
+    label: 'state',
+    description: 'The name of the state, province, or county. If a state is present, prioritize that column.'
+  },
+  {
+    index: 6,
+    label: 'zip',
+    description: 'A standard ZIP code. If a 5-digit zip code is present, use that column.'
+  },
+  {
+    index: 7,
+    label: 'phone',
+    description: 'A telephone number. This should be a full phone number, not just an area code. This will almost always be 7 characters or longer.'
+  },
+  {
+    index: 8,
+    label: 'lead_creation_date',
+    description: 'The data the information was gathered. This may be called created_at, recieved_at. It is not usually a column related to birth_date.'
+  }
+]
+
+const desiredColumnOrder = columnOrderAndDescription.map(item => item.label);
 
 const reorderColumns = (row, columnOrder, desiredColumnOrder) => {
   const reorderedRow = {};
@@ -44,7 +92,7 @@ const writeHeadersToCSV = async (headers, outputFilePath) => {
 
 const processCSV = async (inputFilePath, outputFilePath, desiredColumnOrder) => {
   try {
-    const columnOrder = await guessHeaderIndex(inputFilePath, desiredColumnOrder);
+    const columnOrder = await guessHeaderIndex(inputFilePath, columnOrderAndDescription);
     const startingIndex = await guessDataStartingRow(inputFilePath);
     await mapCSV(inputFilePath, outputFilePath, (row) => reorderColumns(row, columnOrder, desiredColumnOrder), startingIndex, true);
   } catch (error) {
