@@ -34,7 +34,7 @@ const guessDataStartingRow = async (filepath) => {
 
     try {
         const completion = await openai.chat.completions.create({
-            model: "gpt-4-1106-preview",
+            model: "gpt-4o",
             messages: messages,
             temperature: 0.1,
             top_p: 1,
@@ -59,7 +59,7 @@ const guessHeaderIndex = async (filepath, columnOrderAndDescription) => {
     const storeRow = (row) => {
         rows.push(row);
     }
-    await readCSV(filepath, (row) => storeRow(row), 0, 100);
+    await readCSV(filepath, (row) => storeRow(row), 0, 50);
 
     const headersToLocate = columnOrderAndDescription.map(item => item.label);
     const descriptions = columnOrderAndDescription.map(item => `${item.label}: ${item.description}`).join('\n');
