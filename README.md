@@ -13,23 +13,24 @@ CSV Data Mapper is a tool designed to standardize and reformat CSV files by mapp
 ## Installation
 
 1. Clone the repository to your local machine:
-    ```bash
-    git clone https://github.com/alexbilledeaux/csv-data-mapper.git
-    cd csv-data-mapper
-    ```
 
+   ```bash
+   git clone https://github.com/alexbilledeaux/csv-data-mapper.git
+   cd csv-data-mapper
+   ```
 2. Install the required dependencies:
-    ```bash
-    npm install
-    ```
+
+   ```bash
+   npm install
+   ```
 
 ## Usage
 
 1. Place the CSV files you want to reformat into the `inputFiles` directory.
 2. Run the script:
-    ```bash
-    npm start
-    ```
+   ```bash
+   npm start
+   ```
 3. The reformatted CSV files will be saved in the `outputFiles` directory.
 
 ## Packaging
@@ -37,16 +38,15 @@ CSV Data Mapper is a tool designed to standardize and reformat CSV files by mapp
 To package the project into a distributable format using `pkg`, use the provided npm script:
 
 1. Package the project:
-    ```bash
-    npm run build
-    ```
 
+   ```bash
+   npm run build
+   ```
 2. The executables for different platforms will be created in the `dist` directory, with versions for Linux, macOS, and Windows.
 
 ## Configuration
 
-- **Column Order:** The script uses a predefined column order to rearrange the columns in your CSV files. You can customize this order by modifying the desiredColumnOrder array in index.js.
-
+- **Column Order:** You can customize the order and content of the resulting CSV file by modifying the COLUMNS array in a config.json file at the application's root. COLUMNS is an array of objects, each with an 'index', 'label', 'description', and 'required' field. OpenAI will use the description to better detect the information and will not include any rows that are missing columns marked as 'required'.
 - **OpenAI Key:** Place your OPENAI_KEY in a config.json file at the application's root.
 
 ## License

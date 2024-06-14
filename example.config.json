@@ -1,3 +1,29 @@
 {
-    "OPENAI_KEY": "your-api-key"
+    "OPENAI_KEY": "your-api-key",
+    "COLUMNS": [
+        {
+          "index": 0,
+          "label": "email",
+          "description": "A standard email address, which contains an @ sign.",
+          "required": true
+        },
+        {
+          "index": 1,
+          "label": "first",
+          "description": "A first name.",
+          "required": false
+        },
+        {
+          "index": 2,
+          "label": "last",
+          "description": "A last name or surname.",
+          "required": false
+        },
+        {
+          "index": 3,
+          "label": "street",
+          "description": "A street address, sometimes including a unit number.",
+          "required": false
+        }
+      ]
 }

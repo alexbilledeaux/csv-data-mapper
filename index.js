@@ -32,9 +32,12 @@ const getColumns = () => {
 const columns = getColumns();
 
 const desiredColumnOrder = columns.map(item => item.label);
+const requiredColumns = columns.filter(item => item.required).map(item => item.label);
 
 const reorderColumns = (row, columnOrder, desiredColumnOrder) => {
   const reorderedRow = {};
+  let isValidRow = true;
+
   desiredColumnOrder.forEach((column) => {
     const index = Object.keys(columnOrder).find(key => columnOrder[key] === column);
     if (index !== undefined && row[index] !== undefined) {
@@ -42,8 +45,14 @@ const reorderColumns = (row, columnOrder, desiredColumnOrder) => {
     } else {
       reorderedRow[column] = '';
     }
+
+    // Check for required columns
+    if (requiredColumns.includes(column) && (!row[index] || row[index].trim() === '')) {
+      isValidRow = false;
+    }
   });
-  return reorderedRow;
+
+  return isValidRow ? reorderedRow : null; // Return null if the row is invalid
 };
 
 const writeHeadersToCSV = async (headers, outputFilePath) => {
